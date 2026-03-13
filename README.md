@@ -1,0 +1,1 @@
+Pokedex in a command-line REPL with power of PokéAPI. Lets user look up information like name, type, stats etc about Pokemon.
