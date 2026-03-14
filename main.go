@@ -12,16 +12,16 @@ import (
 type cliCommand struct {
 	name string
 	description string
-	callback func(*pokeapi.Config, *pokecache.Cache) error
+	callback func(*pokeapi.Config, *pokecache.Cache, string) error
 }
 
-func commandExit(config *pokeapi.Config, cache *pokecache.Cache) error {
+func commandExit(config *pokeapi.Config, cache *pokecache.Cache, locationName string) error {
 	fmt.Printf("Closing the Pokedex... Goodbye!\n")
 	os.Exit(0)
 	return nil
 }
 
-func commandHelp(config *pokeapi.Config, cache *pokecache.Cache) error {
+func commandHelp(config *pokeapi.Config, cache *pokecache.Cache, locationName string) error {
 	fmt.Printf("Welcome to the Pokedex!\n")
 	fmt.Printf("Usage:\n\n")
 	fmt.Printf("help: Displays a help message\n")
@@ -29,7 +29,7 @@ func commandHelp(config *pokeapi.Config, cache *pokecache.Cache) error {
 	return nil
 }
 
-func commandMap(config *pokeapi.Config, cache *pokecache.Cache) error {
+func commandMap(config *pokeapi.Config, cache *pokecache.Cache, locationName string) error {
 	// get next locations
 	pokeapi.GetLocationsData(true, config, cache)
 
@@ -40,7 +40,7 @@ func commandMap(config *pokeapi.Config, cache *pokecache.Cache) error {
 	return nil
 }
 
-func commandMapBack(config *pokeapi.Config, cache *pokecache.Cache) error {
+func commandMapBack(config *pokeapi.Config, cache *pokecache.Cache, locationName string) error {
 	// get previous locations
 	pokeapi.GetLocationsData(false, config, cache)
 
@@ -48,6 +48,22 @@ func commandMapBack(config *pokeapi.Config, cache *pokecache.Cache) error {
 	for _, m := range config.Results {
 		fmt.Printf("%v\n", m["name"])
 	}
+	return nil
+}
+
+func commandExplore(config *pokeapi.Config, cache *pokecache.Cache, locationName string) error {
+	fmt.Printf("Exploring %v...\n", locationName)
+	fmt.Printf("Found Pokemon:\n")
+
+	pokemons, err := pokeapi.GetPokemonsByLocation(locationName, cache)
+	if err != nil {
+		return err
+	}
+
+	for _, pokemon := range pokemons {
+		fmt.Printf(" - %v\n", pokemon)
+	}
+
 	return nil
 }
 
@@ -74,6 +90,11 @@ func main() {
 			description: "List Previous 20 locations",
 			callback: commandMapBack,
 		},
+		"explore": cliCommand{
+			name: "explore",
+			description: "List pokemons from area",
+			callback: commandExplore,
+		},
 	}
 
 	// tracking locations offset
@@ -82,6 +103,10 @@ func main() {
 	// caching locations to not repeat requests
 	locationsCache := pokecache.NewCache(10)
 	
+	// default location name
+	// kinda ugly because other commands than "explore" don't need this
+	locationName := ""
+
 	// listening read eval print loop
 	scanner := bufio.NewScanner(os.Stdin)
 	for ;; {
@@ -96,8 +121,20 @@ func main() {
 			if c, err := commandRegister[command]; err == false {
 				fmt.Printf("Unknown command\n")
 			} else {
-				c.callback(locationsConfig, locationsCache)
+				if c.name == "explore" {
+					if len(user_tokens) < 2 {
+					fmt.Printf("Location is not provided\n")
+					} else {
+						locationName = user_tokens[1]
+					}
+				}
+				c.callback(locationsConfig, locationsCache, locationName)
 			}
 		}
 	}
 }
+
+// func main() {
+// 	cache := pokecache.NewCache(10)
+// 	pokeapi.GetPokemonsByLocation("16", cache)
+// }

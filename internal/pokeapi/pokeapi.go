@@ -16,6 +16,13 @@ type Config struct {
 	Results []map[string]string `json:"results"`
 }
 
+// it's not guaranteed that all the remaining fields following the problematic one 
+// will be unmarshaled into the target object
+// so creating new struct solely for pokemons
+type encounters struct {
+	Encounters []map[string]interface{} `json:"pokemon_encounters"`
+}
+
 func GetLocationsData(isnext bool, config *Config, cache *pokecache.Cache) error {
 	// use query params to get next or prev 20 locs
 	// https://pokeapi.co/api/v2/location-area/?offset=20&limit=20
@@ -89,4 +96,61 @@ func GetLocationsData(isnext bool, config *Config, cache *pokecache.Cache) error
 	}
 
 	return nil
+}
+
+func GetPokemonsByLocation(locationName string, cache *pokecache.Cache) ([]string, error) {
+	url := "https://pokeapi.co/api/v2/location-area/" + locationName
+	encountersData := encounters{}
+	// default capacity 32
+	pokemons := make([]string, 0, 32)
+
+	if data, exists := cache.Get(locationName); exists {
+		err := json.Unmarshal(data, &encountersData)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, val := range encountersData.Encounters {
+			pokemons = append(pokemons, val["pokemon"].(map[string]interface{})["name"].(string))
+		}
+
+		return pokemons, nil
+	} else {
+
+		client := &http.Client{
+			Transport: &http.Transport{
+				TLSNextProto: make(map[string]func(string, *tls.Conn) http.RoundTripper),
+			},
+			Timeout: 10 * time.Second,
+		}
+
+		req, err := http.NewRequest("GET", url, nil)
+		if err != nil {
+			return nil, err
+		}
+
+		res, err := client.Do(req)
+		if err != nil {
+			return nil, err
+		}
+		defer res.Body.Close()
+
+		data, err := io.ReadAll(res.Body)
+		if err != nil {
+			return nil, err
+		}
+		cache.Add(url, data)
+		
+		encountersData := encounters{}
+		err = json.Unmarshal(data, &encountersData)
+		if err != nil {
+			return nil, err
+		}
+		
+		for _, val := range encountersData.Encounters {
+			pokemons = append(pokemons, val["pokemon"].(map[string]interface{})["name"].(string))
+		}
+
+		return pokemons, nil
+	}
 }
