@@ -278,3 +278,12 @@ func PrintPokemonData(pokemonName string, pokedex *Pokedex) error {
 
 	return nil
 }
+
+func PrintPokedexPokemons(pokedex *Pokedex) error {
+	fmt.Printf("Your Pokedex:\n")
+	for name, _ := range pokedex.CaughtPokemons {
+		fmt.Printf("  - %v\n", name)
+	} 
+
+	return nil
+}

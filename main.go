@@ -94,6 +94,12 @@ func commandInspect(config *pokeapi.Config, cache *pokecache.Cache, pokedex *pok
 	return nil
 }
 
+func commandPokedex(config *pokeapi.Config, cache *pokecache.Cache, pokedex *pokeapi.Pokedex, locationName string, pokemonName string) error {
+	pokeapi.PrintPokedexPokemons(pokedex)
+	
+	return nil
+}
+
 func main() {
 	// possible commands
 	commandRegister := map[string]cliCommand {
@@ -131,6 +137,11 @@ func main() {
 			name: "inspect",
 			description: "Print catched Pokemon data",
 			callback: commandInspect,
+		},
+		"pokedex": cliCommand{
+			name: "pokedex",
+			description: "List pokemons in Pokedex",
+			callback: commandPokedex,
 		},
 	}
 
