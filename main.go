@@ -8,28 +8,29 @@ import (
 	"internal/pokecache"
 )
 
-
+// variadic callback needed...
 type cliCommand struct {
 	name string
 	description string
-	callback func(*pokeapi.Config, *pokecache.Cache, string) error
+	callback func(*pokeapi.Config, *pokecache.Cache, *pokeapi.Pokedex, string, string) error
 }
 
-func commandExit(config *pokeapi.Config, cache *pokecache.Cache, locationName string) error {
+func commandExit(config *pokeapi.Config, cache *pokecache.Cache, pokedex *pokeapi.Pokedex, locationName string, pokemonName string) error {
 	fmt.Printf("Closing the Pokedex... Goodbye!\n")
 	os.Exit(0)
 	return nil
 }
 
-func commandHelp(config *pokeapi.Config, cache *pokecache.Cache, locationName string) error {
+func commandHelp(config *pokeapi.Config, cache *pokecache.Cache, pokedex *pokeapi.Pokedex, locationName string, pokemonName string) error {
 	fmt.Printf("Welcome to the Pokedex!\n")
 	fmt.Printf("Usage:\n\n")
 	fmt.Printf("help: Displays a help message\n")
+	// xd
 	fmt.Printf("exit: Exit the Pokedex\n")
 	return nil
 }
 
-func commandMap(config *pokeapi.Config, cache *pokecache.Cache, locationName string) error {
+func commandMap(config *pokeapi.Config, cache *pokecache.Cache, pokedex *pokeapi.Pokedex, locationName string, pokemonName string) error {
 	// get next locations
 	pokeapi.GetLocationsData(true, config, cache)
 
@@ -40,7 +41,7 @@ func commandMap(config *pokeapi.Config, cache *pokecache.Cache, locationName str
 	return nil
 }
 
-func commandMapBack(config *pokeapi.Config, cache *pokecache.Cache, locationName string) error {
+func commandMapBack(config *pokeapi.Config, cache *pokecache.Cache, pokedex *pokeapi.Pokedex, locationName string, pokemonName string) error {
 	// get previous locations
 	pokeapi.GetLocationsData(false, config, cache)
 
@@ -51,7 +52,7 @@ func commandMapBack(config *pokeapi.Config, cache *pokecache.Cache, locationName
 	return nil
 }
 
-func commandExplore(config *pokeapi.Config, cache *pokecache.Cache, locationName string) error {
+func commandExplore(config *pokeapi.Config, cache *pokecache.Cache, pokedex *pokeapi.Pokedex, locationName string, pokemonName string) error {
 	fmt.Printf("Exploring %v...\n", locationName)
 	fmt.Printf("Found Pokemon:\n")
 
@@ -62,6 +63,23 @@ func commandExplore(config *pokeapi.Config, cache *pokecache.Cache, locationName
 
 	for _, pokemon := range pokemons {
 		fmt.Printf(" - %v\n", pokemon)
+	}
+
+	return nil
+}
+
+func commandCatch(config *pokeapi.Config, cache *pokecache.Cache, pokedex *pokeapi.Pokedex, locationName string, pokemonName string) error {
+	fmt.Printf("Throwing a Pokeball at %v...\n", pokemonName)
+	
+	catched, err := pokeapi.TryCatchPokemon(pokemonName, cache, pokedex)
+	if err != nil {
+		return err
+	}
+
+	if catched {
+		fmt.Printf("%v was caught!\n", pokemonName)
+	} else {
+		fmt.Printf("%v escaped!\n", pokemonName)
 	}
 
 	return nil
@@ -95,17 +113,26 @@ func main() {
 			description: "List pokemons from area",
 			callback: commandExplore,
 		},
+		"catch": cliCommand{
+			name: "catch",
+			description: "Try to catch a Pokemon",
+			callback: commandCatch,
+		},
 	}
 
 	// tracking locations offset
 	locationsConfig := &pokeapi.Config{}
 
 	// caching locations to not repeat requests
-	locationsCache := pokecache.NewCache(10)
+	locationsCache := pokecache.NewCache(15)
+
+	// pokedex keeps catched pokemons
+	playerPokedex := &pokeapi.Pokedex{CaughtPokemons: make(map[string]pokeapi.Pokemon, 16),}
 	
-	// default location name
-	// kinda ugly because other commands than "explore" don't need this
+	// default location and pokemon
+	// kinda ugly because other commands than "explore"/"catch" don't need this
 	locationName := ""
+	pokemonName := ""
 
 	// listening read eval print loop
 	scanner := bufio.NewScanner(os.Stdin)
@@ -127,8 +154,14 @@ func main() {
 					} else {
 						locationName = user_tokens[1]
 					}
+				} else if c.name == "catch" {
+					if len(user_tokens) < 2 {
+					fmt.Printf("Pokemon is not provided\n")
+					} else {
+						pokemonName = user_tokens[1]
+					}
 				}
-				c.callback(locationsConfig, locationsCache, locationName)
+				c.callback(locationsConfig, locationsCache, playerPokedex, locationName, pokemonName)
 			}
 		}
 	}

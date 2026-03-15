@@ -7,6 +7,7 @@ import (
 	"time"
 	"encoding/json"
 	"crypto/tls"
+	"math/rand"
 	"internal/pokecache"
 )
 
@@ -21,6 +22,19 @@ type Config struct {
 // so creating new struct solely for pokemons
 type encounters struct {
 	Encounters []map[string]interface{} `json:"pokemon_encounters"`
+}
+
+type Pokedex struct {
+	CaughtPokemons map[string]Pokemon
+}
+
+// just a name for now
+type Pokemon struct {
+	Name string
+}
+
+type pokemonData struct {
+	Experience int `json:"base_experience"`
 }
 
 func GetLocationsData(isnext bool, config *Config, cache *pokecache.Cache) error {
@@ -56,7 +70,7 @@ func GetLocationsData(isnext bool, config *Config, cache *pokecache.Cache) error
 	}
 
 	// debug caching
-	cache.PrintEntriesTime()
+	// cache.PrintEntriesTime()
 
 	// checking for url in cache
 	if val, exists := cache.Get(url); exists {
@@ -153,4 +167,64 @@ func GetPokemonsByLocation(locationName string, cache *pokecache.Cache) ([]strin
 
 		return pokemons, nil
 	}
+}
+
+// higher base experience -> harder to catch
+// suppose(!) that 500 is max base exp, anything higher -> no catch
+func TryCatchPokemon(pokemonName string, cache *pokecache.Cache, pokedex *Pokedex) (bool, error) {
+	var maxExp float32 = 500
+	pokeData := pokemonData{}
+	var url string = "https://pokeapi.co/api/v2/pokemon/" + pokemonName
+
+	if data, exists := cache.Get(url); exists {
+		err := json.Unmarshal(data, &pokeData)
+		if err != nil {
+			return false, err
+		}
+	} else {
+		client := &http.Client{
+			Transport: &http.Transport{
+				TLSNextProto: make(map[string]func(string, *tls.Conn) http.RoundTripper),
+			},
+			Timeout: 10 * time.Second,
+		}
+
+		req, err := http.NewRequest("GET", url, nil)
+		if err != nil {
+			return false, err
+		}
+
+		res, err := client.Do(req)
+		if err != nil {
+			return false, err
+		}
+		defer res.Body.Close()
+
+		data, err := io.ReadAll(res.Body)
+		if err != nil {
+			return false, err
+		}
+		cache.Add(url, data)
+
+		err = json.Unmarshal(data, &pokeData)
+		if err != nil {
+			return false, err
+		}
+	}
+
+	// calculating chance to catch and using random float32 in [0,1) range
+	var catched bool = false
+	chanceToCatch := 1 - float32(pokeData.Experience) / maxExp
+	if rand.Float32() > chanceToCatch {
+		catched = true
+	}
+
+	// adding pokemon to shared *Pokedex
+	if catched {
+		pokemon := Pokemon{Name: pokemonName}
+		// don't care about duplicates
+		pokedex.CaughtPokemons[pokemonName] = pokemon
+	}
+		
+	return catched, nil
 }
