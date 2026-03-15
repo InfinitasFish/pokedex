@@ -31,9 +31,17 @@ type Pokedex struct {
 // just a name for now
 type Pokemon struct {
 	Name string
+	Height int
+	Weight int
+	Stats map[string]float64
+	Types []string
 }
 
 type pokemonData struct {
+	Height int `json:"height"`
+	Weight int `json:"weight"`
+	Stats []map[string]interface{} `json:"stats"`
+	Types []map[string]interface{} `json:"types"`
 	Experience int `json:"base_experience"`
 }
 
@@ -214,17 +222,59 @@ func TryCatchPokemon(pokemonName string, cache *pokecache.Cache, pokedex *Pokede
 
 	// calculating chance to catch and using random float32 in [0,1) range
 	var catched bool = false
-	chanceToCatch := 1 - float32(pokeData.Experience) / maxExp
+	chanceToCatch := float32(pokeData.Experience) / maxExp
 	if rand.Float32() > chanceToCatch {
 		catched = true
 	}
 
 	// adding pokemon to shared *Pokedex
 	if catched {
-		pokemon := Pokemon{Name: pokemonName}
-		// don't care about duplicates
+		pokeStats := make(map[string]float64, len(pokeData.Stats))
+		pokeTypes := make([]string, 0, len(pokeData.Types))
+
+		for _, stat := range pokeData.Stats {
+			statName := stat["stat"].(map[string]interface{})["name"].(string)
+			baseStat := stat["base_stat"].(float64)
+			pokeStats[statName] = baseStat
+		}
+
+		for _, ptype := range pokeData.Types {
+			pokeTypes = append(pokeTypes, ptype["type"].(map[string]interface{})["name"].(string))
+		}
+
+		pokemon := Pokemon{
+			Name: pokemonName,
+			Height: pokeData.Height,
+			Weight: pokeData.Weight,
+			Stats: pokeStats,
+			Types: pokeTypes,
+		}
 		pokedex.CaughtPokemons[pokemonName] = pokemon
 	}
 		
 	return catched, nil
+}
+
+// Pokemon pretty print for inspecting catched pokemons
+func PrintPokemonData(pokemonName string, pokedex *Pokedex) error {
+	if _, exists := pokedex.CaughtPokemons[pokemonName]; !exists {
+		return fmt.Errorf("%v isn't in Pokedex\n", pokemonName)
+	}
+
+	pokemon := pokedex.CaughtPokemons[pokemonName]
+	fmt.Printf("Name: %v\n", pokemon.Name)
+	fmt.Printf("Weight: %v\n", pokemon.Weight)
+	fmt.Printf("Height: %v\n", pokemon.Height)
+
+	fmt.Printf("Stats:\n")
+	for stat, statVal := range pokemon.Stats {
+		fmt.Printf("  -%v: %v\n", stat, statVal)
+	}
+
+	fmt.Printf("Types:\n")
+	for _, ptype := range pokemon.Types {
+		fmt.Printf("  - %v\n", ptype)
+	}
+
+	return nil
 }

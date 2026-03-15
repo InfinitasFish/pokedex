@@ -85,6 +85,15 @@ func commandCatch(config *pokeapi.Config, cache *pokecache.Cache, pokedex *pokea
 	return nil
 }
 
+func commandInspect(config *pokeapi.Config, cache *pokecache.Cache, pokedex *pokeapi.Pokedex, locationName string, pokemonName string) error {
+	err := pokeapi.PrintPokemonData(pokemonName, pokedex)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func main() {
 	// possible commands
 	commandRegister := map[string]cliCommand {
@@ -118,6 +127,11 @@ func main() {
 			description: "Try to catch a Pokemon",
 			callback: commandCatch,
 		},
+		"inspect": cliCommand{
+			name: "inspect",
+			description: "Print catched Pokemon data",
+			callback: commandInspect,
+		},
 	}
 
 	// tracking locations offset
@@ -150,13 +164,13 @@ func main() {
 			} else {
 				if c.name == "explore" {
 					if len(user_tokens) < 2 {
-					fmt.Printf("Location is not provided\n")
+					fmt.Printf("Location name is not provided\n")
 					} else {
 						locationName = user_tokens[1]
 					}
-				} else if c.name == "catch" {
+				} else if c.name == "catch" || c.name == "inspect" {
 					if len(user_tokens) < 2 {
-					fmt.Printf("Pokemon is not provided\n")
+					fmt.Printf("Pokemon name is not provided\n")
 					} else {
 						pokemonName = user_tokens[1]
 					}
